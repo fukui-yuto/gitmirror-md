@@ -1,0 +1,15 @@
+[project]
+name = "gitmirror-md"
+version = "0.1.0"
+description = "GitLab Wiki/Issue を同一リポジトリの docs/ 配下に Markdown でミラーする CI/CD ツール"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "python-gitlab==4.13.0",
+    "pyyaml==6.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

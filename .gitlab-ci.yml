@@ -1,0 +1,42 @@
+stages:
+  - sync
+
+variables:
+  GIT_STRATEGY: clone
+  GIT_DEPTH: "0"
+  SYNC_TARGET: "all"
+  GIT_AUTHOR_NAME: "gitmirror-bot"
+  GIT_AUTHOR_EMAIL: "gitmirror-bot@noreply.local"
+
+.sync_base:
+  stage: sync
+  image: python:3.12-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git
+    - pip install --no-cache-dir -r requirements.txt
+    - git config user.name "${GIT_AUTHOR_NAME}"
+    - git config user.email "${GIT_AUTHOR_EMAIL}"
+    - git remote set-url origin "https://oauth2:${SYNC_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+  script:
+    - |
+      if [ "$SYNC_TARGET" = "wiki" ] || [ "$SYNC_TARGET" = "all" ]; then
+        python -m scripts.sync_wiki
+      fi
+      if [ "$SYNC_TARGET" = "issues" ] || [ "$SYNC_TARGET" = "all" ]; then
+        python -m scripts.sync_issues
+      fi
+    - |
+      git add docs/
+      if git diff --cached --quiet; then
+        echo "No changes to commit."
+      else
+        git commit -m "chore(sync): update docs from wiki/issues [skip ci]"
+        git push origin HEAD:main
+      fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule"'
+
+sync:run:
+  extends: .sync_base
+  tags:
+    - docker

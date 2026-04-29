@@ -1,0 +1,55 @@
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:17.5.2-ce.0
+    container_name: test-gitlab
+    hostname: gitlab.local
+    restart: unless-stopped
+    ports:
+      - "8080:80"      # Web UI / API
+      - "2222:22"      # SSH (git push用)
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.local:8080'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        # 起動時間短縮のため不要コンポーネント停止
+        prometheus_monitoring['enable'] = false
+        gitlab_rails['monitoring_whitelist'] = ['127.0.0.0/8']
+        # 初期rootパスワード
+        gitlab_rails['initial_root_password'] = 'RootPass12345!'
+        # Webhookでlocalhostや内部ネットを叩けるようにする(検証用)
+        gitlab_rails['webhook_timeout'] = 30
+    shm_size: '256m'
+    volumes:
+      - gitlab-config:/etc/gitlab
+      - gitlab-logs:/var/log/gitlab
+      - gitlab-data:/var/opt/gitlab
+    networks:
+      - gitlab-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/-/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 5m
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:v17.5.2
+    container_name: test-gitlab-runner
+    restart: unless-stopped
+    depends_on:
+      - gitlab
+    volumes:
+      - gitlab-runner-config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - gitlab-net
+
+volumes:
+  gitlab-config:
+  gitlab-logs:
+  gitlab-data:
+  gitlab-runner-config:
+
+networks:
+  gitlab-net:
+    driver: bridge
