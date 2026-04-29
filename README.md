@@ -47,7 +47,6 @@ export CI_PROJECT_PATH="root/sample"
 │       ├── open/
 │       └── closed/
 └── docs_project/
-    ├── CLAUDE_CODE_SPEC.md   # 実装仕様書
     ├── SETUP.md              # テスト環境構築手順
     └── USAGE.md              # 他リポジトリでの導入ガイド
 ```
