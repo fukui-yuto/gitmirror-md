@@ -98,4 +98,4 @@ PIPELINE_TEST=1 SYNC_TOKEN=<token> CI_PROJECT_ID=<id> uv run pytest tests/test_p
 自動生成ファイルには `managed_by: gitmirror-md` マーカーが front matter に含まれており、
 このマーカーがないファイルは同期対象外として保護されます。
 
-ただし、手動追加ファイルは `index.md` には反映されません。`index.md` は API から取得したデータのみで生成されます。
+手動追加ファイルは `index.md` にも「手動追加ページ」「手動追加ファイル」セクションとして反映されます。
