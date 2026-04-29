@@ -92,16 +92,26 @@ class TestDumpFrontMatter:
 
 
 class TestCleanOrphanedFiles:
-    def test_removes_orphaned_files(self, tmp_path):
+    MARKER = "---\nmanaged_by: gitmirror-md\n---\n"
+
+    def test_removes_orphaned_managed_files(self, tmp_path):
         valid = tmp_path / "keep.md"
         orphan = tmp_path / "orphan.md"
-        valid.write_text("keep")
-        orphan.write_text("delete")
+        valid.write_text(self.MARKER + "keep")
+        orphan.write_text(self.MARKER + "delete")
 
         deleted = clean_orphaned_files(tmp_path, {valid})
         assert orphan in deleted
         assert not orphan.exists()
         assert valid.exists()
+
+    def test_preserves_unmanaged_files(self, tmp_path):
+        manual = tmp_path / "manual.md"
+        manual.write_text("# My manual notes")
+
+        deleted = clean_orphaned_files(tmp_path, set())
+        assert manual not in deleted
+        assert manual.exists()
 
     def test_preserves_gitkeep(self, tmp_path):
         gitkeep = tmp_path / ".gitkeep"
@@ -115,7 +125,7 @@ class TestCleanOrphanedFiles:
         subdir = tmp_path / "empty_sub"
         subdir.mkdir()
         orphan = subdir / "file.md"
-        orphan.write_text("x")
+        orphan.write_text(self.MARKER + "x")
 
         clean_orphaned_files(tmp_path, set())
         assert not subdir.exists()

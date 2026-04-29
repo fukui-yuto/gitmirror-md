@@ -156,9 +156,9 @@ class TestSyncIssues:
         assert content.index("| 1 |") < content.index("| 2 |")
 
     def test_removes_deleted_issue(self, mock_env, work_dir):
-        # File exists for issue that no longer exists in API
+        # Managed file exists for issue that no longer exists in API
         orphan = work_dir / "docs" / "issues" / "open" / "0099-deleted.md"
-        orphan.write_text("old")
+        orphan.write_text("---\nmanaged_by: gitmirror-md\n---\nold")
 
         issues = [FakeIssue(1, "Current")]
         mock_project = MagicMock()

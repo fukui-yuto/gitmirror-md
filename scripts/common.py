@@ -42,14 +42,31 @@ def write_file_if_changed(path: Path, content: str) -> bool:
 
 
 def dump_front_matter(data: dict) -> str:
-    """YAML front matter 文字列を生成する."""
-    yml = yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    """YAML front matter 文字列を生成する.
+
+    自動生成マーカー managed_by: gitmirror-md を末尾に付与する.
+    """
+    fm_data = {**data, "managed_by": "gitmirror-md"}
+    yml = yaml.dump(fm_data, default_flow_style=False, allow_unicode=True, sort_keys=False)
     return f"---\n{yml}---\n"
 
 
-def clean_orphaned_files(target_dir: Path, valid_paths: set[Path]) -> list[Path]:
-    """target_dir 以下で valid_paths に含まれないファイルを削除する.
+MANAGED_MARKER = "managed_by: gitmirror-md"
 
+
+def is_managed_file(path: Path) -> bool:
+    """ファイルが gitmirror-md によって自動生成されたものか判定する."""
+    try:
+        head = path.read_text(encoding="utf-8")[:500]
+        return MANAGED_MARKER in head
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def clean_orphaned_files(target_dir: Path, valid_paths: set[Path]) -> list[Path]:
+    """target_dir 以下で valid_paths に含まれない自動生成ファイルを削除する.
+
+    手動追加ファイル（managed_by マーカーなし）は削除しない。
     .gitkeep は削除対象外。
     Returns:
         削除したパスのリスト.
@@ -60,8 +77,9 @@ def clean_orphaned_files(target_dir: Path, valid_paths: set[Path]) -> list[Path]
     resolved_valid = {p.resolve() for p in valid_paths}
     for f in target_dir.rglob("*"):
         if f.is_file() and f.name != ".gitkeep" and f.resolve() not in resolved_valid:
-            f.unlink()
-            deleted.append(f)
+            if is_managed_file(f):
+                f.unlink()
+                deleted.append(f)
     # 空ディレクトリを削除（.gitkeep があるものは除く）
     for d in sorted(target_dir.rglob("*"), reverse=True):
         if d.is_dir() and not any(d.iterdir()):

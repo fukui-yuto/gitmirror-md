@@ -81,9 +81,9 @@ class TestSyncWiki:
         assert output.exists()
 
     def test_removes_orphaned_files(self, mock_env, work_dir):
-        # Pre-existing file that no longer exists in wiki
+        # Pre-existing managed file that no longer exists in wiki
         orphan = work_dir / "docs" / "wiki" / "old-page.md"
-        orphan.write_text("old content")
+        orphan.write_text("---\nmanaged_by: gitmirror-md\n---\nold content")
 
         pages = [FakeWikiPage("home", "Home")]
         mock_project = MagicMock()

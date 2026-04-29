@@ -73,7 +73,8 @@ def main():
     valid_paths.add(index_path.resolve())
 
     sorted_pages = sorted(wiki_pages, key=lambda p: p.slug)
-    lines = ["# Wiki ページ一覧\n\n"]
+    lines = [dump_front_matter({"title": "Wiki ページ一覧", "type": "index"})]
+    lines.append("\n# Wiki ページ一覧\n\n")
     for page_ref in sorted_pages:
         slug = page_ref.slug
         title = page_ref.title

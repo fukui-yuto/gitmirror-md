@@ -121,7 +121,8 @@ def main():
     valid_paths.add(index_path.resolve())
 
     sorted_issues = sorted(issues, key=lambda i: i.iid)
-    lines = ["# Issue 一覧\n\n"]
+    lines = [dump_front_matter({"title": "Issue 一覧", "type": "index"})]
+    lines.append("\n# Issue 一覧\n\n")
     lines.append("| iid | state | title | labels | assignees | updated_at |\n")
     lines.append("|-----|-------|-------|--------|-----------|------------|\n")
     for issue in sorted_issues:

@@ -39,12 +39,13 @@ def retry_on_rate_limit(func):
     return wrapper
 
 
+@retry_on_rate_limit
 def get_project() -> "gitlab.v4.objects.Project":
     """環境変数から GitLab プロジェクトオブジェクトを取得する."""
     url = os.environ["GITLAB_URL"]
     token = os.environ["SYNC_TOKEN"]
     project_id = os.environ["CI_PROJECT_ID"]
 
-    gl = gitlab.Gitlab(url, private_token=token)
+    gl = gitlab.Gitlab(url, private_token=token, keep_base_url=True)
     gl.auth()
     return gl.projects.get(project_id)
