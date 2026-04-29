@@ -35,7 +35,7 @@ GitLab UI: **Settings → CI/CD → Variables** に以下を追加します。
 
 | Key | Value | 備考 |
 |-----|-------|------|
-| `SYNC_TOKEN` | Personal Access Token | `api` + `write_repository` scope が必要 |
+| `SYNC_TOKEN` | Personal Access Token | `api` + `write_repository` scope が必要（詳細は手順3参照） |
 | `GITLAB_URL` | `http://your-gitlab-host/` | GitLab インスタンスの URL |
 
 > **注意**: `CI_PROJECT_ID` と `CI_PROJECT_PATH` は GitLab CI が自動で設定するため手動設定は不要です。
@@ -48,18 +48,29 @@ GitLab UI: **Settings → CI/CD → Variables** に以下を追加します。
 
 GitLab UI: **User Settings → Access Tokens**
 
-- **Scopes**: `api`, `read_repository`, `write_repository`
+- **Scopes**: `api`, `write_repository`
 - **Expiration**: 必要に応じて設定（無期限も可）
 
 このトークンを `SYNC_TOKEN` 変数に設定します。
 
-### 4. Pipeline Trigger Token を作成
+> **注意**: `api` scope には `read_repository` の権限が含まれるため、別途指定する必要はありません。
+
+### 4. Protected branch の設定
+
+`.gitlab-ci.yml` は `git push origin HEAD:main` で直接 main ブランチに push します。
+GitLab ではデフォルトブランチが Protected branch になっているため、`SYNC_TOKEN` のユーザーが push 可能である必要があります。
+
+GitLab UI: **Settings → Repository → Protected branches**
+
+- `main` ブランチの **Allowed to push and merge** にトークンのユーザー（またはそのロール）を追加
+
+### 5. Pipeline Trigger Token を作成
 
 GitLab UI: **Settings → CI/CD → Pipeline trigger tokens**
 
 「Add trigger」でトークンを発行します。このトークンは Webhook の URL に使用します。
 
-### 5. Webhook を設定
+### 6. Webhook を設定
 
 GitLab UI: **Settings → Webhooks**
 
@@ -81,14 +92,14 @@ GitLab UI: **Settings → Webhooks**
 
 > `<PROJECT_ID>` は **Settings → General** で確認できます。
 
-### 6. ローカルネットワーク許可（Self-Managed のみ）
+### 7. ローカルネットワーク許可（Self-Managed のみ）
 
 Webhook が同一インスタンスの API を叩く場合:
 
 **Admin Area → Settings → Network → Outbound requests**
 - `Allow requests to the local network from webhooks and integrations` を有効化
 
-### 7. 動作確認
+### 8. 動作確認
 
 1. GitLab UI: **Build → Pipelines → Run pipeline** で手動実行
    - `SYNC_TARGET` = `all` で実行
@@ -117,6 +128,20 @@ variables:
 
 または CI/CD Variables で上書きできます。
 
+### デフォルトブランチの変更
+
+デフォルトブランチが `main` 以外の場合、以下の2箇所を変更してください。
+
+1. `.gitlab-ci.yml` の push 先:
+   ```yaml
+   git push origin HEAD:your-branch
+   ```
+
+2. Webhook URL の `ref` パラメータ:
+   ```
+   ...&ref=your-branch&variables[SYNC_TARGET]=wiki
+   ```
+
 ### Runner タグの変更
 
 `.gitlab-ci.yml` の `tags` セクションを環境に合わせて変更:
@@ -134,7 +159,7 @@ sync:run:
 自動生成ファイルには YAML front matter に `managed_by: gitmirror-md` マーカーが含まれており、
 このマーカーがないファイルは削除対象外です。
 
-ただし、手動追加ファイルは自動生成される `index.md` には反映されません。
+手動追加ファイルは `index.md` にも「手動追加ページ」「手動追加ファイル」セクションとして反映されます。
 
 ## トラブルシューティング
 
