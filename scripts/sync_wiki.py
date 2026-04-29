@@ -7,6 +7,7 @@ from pathlib import Path
 from scripts.common import (
     clean_orphaned_files,
     dump_front_matter,
+    is_managed_file,
     rewrite_upload_links,
     write_file_if_changed,
 )
@@ -79,6 +80,19 @@ def main():
         slug = page_ref.slug
         title = page_ref.title
         lines.append(f"- [{title}]({slug}.md)\n")
+
+    # 手動追加ファイルも index に含める
+    manual_files = []
+    for f in DOCS_WIKI_DIR.rglob("*.md"):
+        if f.name in ("index.md", ".gitkeep"):
+            continue
+        if f.resolve() not in {p.resolve() for p in valid_paths} and not is_managed_file(f):
+            rel = f.relative_to(DOCS_WIKI_DIR).as_posix()
+            manual_files.append((rel, f.stem))
+    if manual_files:
+        lines.append("\n## 手動追加ページ\n\n")
+        for rel_path, name in sorted(manual_files):
+            lines.append(f"- [{name}]({rel_path})\n")
 
     index_content = "".join(lines)
     if write_file_if_changed(index_path, index_content):

@@ -7,6 +7,7 @@ from pathlib import Path
 from scripts.common import (
     clean_orphaned_files,
     dump_front_matter,
+    is_managed_file,
     rewrite_upload_links,
     slugify,
     write_file_if_changed,
@@ -137,6 +138,22 @@ def main():
         lines.append(
             f"| {iid} | {state} | [{title}]({subdir}/{filename}) | {labels} | {assignees} | {updated} |\n"
         )
+
+    # 手動追加ファイルも index に含める
+    manual_files = []
+    for subdir in (OPEN_DIR, CLOSED_DIR):
+        if not subdir.exists():
+            continue
+        for f in subdir.rglob("*.md"):
+            if f.name == ".gitkeep":
+                continue
+            if f.resolve() not in {p.resolve() for p in valid_paths} and not is_managed_file(f):
+                rel = f.relative_to(DOCS_ISSUES_DIR).as_posix()
+                manual_files.append((rel, f.stem))
+    if manual_files:
+        lines.append("\n## 手動追加ファイル\n\n")
+        for rel_path, name in sorted(manual_files):
+            lines.append(f"- [{name}]({rel_path})\n")
 
     index_content = "".join(lines)
     if write_file_if_changed(index_path, index_content):
