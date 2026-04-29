@@ -17,7 +17,10 @@ variables:
     - pip install --no-cache-dir -r requirements.txt
     - git config user.name "${GIT_AUTHOR_NAME}"
     - git config user.email "${GIT_AUTHOR_EMAIL}"
-    - git remote set-url origin "https://oauth2:${SYNC_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - |
+      # Construct push URL: use GITLAB_URL (overridable) with token auth
+      PUSH_URL="$(echo ${GITLAB_URL%/}/${CI_PROJECT_PATH}.git | sed "s|://|://oauth2:${SYNC_TOKEN}@|")"
+      git remote set-url origin "$PUSH_URL"
   script:
     - |
       if [ "$SYNC_TARGET" = "wiki" ] || [ "$SYNC_TARGET" = "all" ]; then

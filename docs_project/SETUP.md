@@ -18,7 +18,10 @@ curl -fsS http://localhost:8080/-/health
 
 ## 2. hosts 設定(任意だが推奨)
 
-`external_url` を `gitlab.local:8080` にしているため、以下を `/etc/hosts` に追記すると Web UI / git clone のURLが安定します。
+`external_url` を `gitlab.local:8080` にしているため、以下を hosts ファイルに追記すると Web UI のURLが安定します。
+
+**Windows**: `C:\Windows\System32\drivers\etc\hosts`
+**Linux/Mac**: `/etc/hosts`
 
 ```
 127.0.0.1   gitlab.local
@@ -39,7 +42,7 @@ curl -fsS http://localhost:8080/-/health
 ## 4. テスト用プロジェクト作成
 
 1. New Project → Create blank project
-2. Project name: `wiki-issue-sync-test`
+2. Project name: `sync-test`
 3. Visibility: Private で OK
 4. **Initialize repository with a README** にチェック
 
@@ -48,35 +51,47 @@ curl -fsS http://localhost:8080/-/health
 - **Settings → General → Visibility, project features, permissions**
   - Wiki: Enabled
   - Issues: Enabled
-- **Settings → Webhooks**(後述、同期トリガー用)
 
 ## 5. Runner 登録
 
+GitLab UI: **Settings → CI/CD → Runners** から registration token を取得。
+
 ```bash
-# GitLab UI: Settings → CI/CD → Runners から registration token を取得
 docker exec -it test-gitlab-runner gitlab-runner register \
   --non-interactive \
-  --url "http://gitlab.local:8080/" \
+  --url "http://gitlab/" \
   --registration-token "<REGISTRATION_TOKEN>" \
   --executor "docker" \
   --docker-image "python:3.12-slim" \
-  --description "test-docker-runner" \
-  --tag-list "docker,sync" \
+  --description "test-runner" \
+  --tag-list "docker" \
   --run-untagged="true" \
   --locked="false" \
-  --docker-network-mode "gitlab-wiki-issue-sync_gitlab-net"
+  --docker-network-mode "gitmirror-md_gitlab-net"
 ```
 
-> `gitlab.local` は Runner コンテナからも名前解決できる必要があります。`docker-compose.yml` で同一ネットワーク (`gitlab-net`) に置いているため、サービス名 `gitlab` でもアクセス可能です。プロジェクト URL を `http://gitlab/` で登録しても動きます。
+> **重要**: `--url` には Docker ネットワーク内のサービス名 `http://gitlab/` を使用してください。
+> `--docker-network-mode` は docker-compose のネットワーク名を指定します。`docker network ls` で確認できます。
 
-## 6. このリポジトリを push
+### Runner の clone_url 設定
+
+Runner がジョブを実行する際、`external_url` の URL をそのまま使ってリポジトリをクローンしようとしますが、Docker ネットワーク内からは `gitlab.local:8080` にアクセスできません。以下の設定で内部 URL を使うようにします。
 
 ```bash
-git init
-git remote add origin http://gitlab.local:8080/root/wiki-issue-sync-test.git
-git add .
-git commit -m "initial: wiki/issue sync skeleton"
-git push -u origin main
+docker exec test-gitlab-runner bash -c 'cat >> /etc/gitlab-runner/config.toml << EOF
+  [runners.docker]
+    network_mode = "gitmirror-md_gitlab-net"
+  clone_url = "http://gitlab/"
+EOF'
+
+docker exec test-gitlab-runner gitlab-runner restart
+```
+
+## 6. ソースコードを push
+
+```bash
+git remote add gitlab http://gitlab.local:8080/root/sync-test.git
+git push gitlab main
 ```
 
 ## 7. CI/CD 変数の設定
@@ -86,10 +101,48 @@ git push -u origin main
 | Key | Value | Protected | Masked |
 |-----|-------|-----------|--------|
 | `SYNC_TOKEN` | 手順3で作ったPAT | No | Yes |
-| `GIT_AUTHOR_NAME` | `wiki-issue-sync-bot` | No | No |
-| `GIT_AUTHOR_EMAIL` | `bot@gitlab.local` | No | No |
+| `GITLAB_URL` | `http://gitlab/` | No | No |
 
-## 8. 停止 / 完全削除
+> **重要**: `GITLAB_URL` には Docker ネットワーク内のサービス名を使用します。
+> デフォルトの `${CI_SERVER_URL}` は `external_url` の値 (`http://gitlab.local:8080`) になりますが、
+> Docker executor のジョブコンテナからはこの URL にアクセスできないため、
+> CI 変数で `http://gitlab/` に上書きする必要があります。
+
+## 8. 動作確認
+
+**Build → Pipelines → Run pipeline** から手動実行。
+
+- `SYNC_TARGET` = `all` で実行
+- パイプラインが成功し、`docs/` にファイルがコミットされることを確認
+
+## 9. テストの実行
+
+```bash
+# ユニットテスト
+uv run pytest tests/test_common.py tests/test_sync_wiki.py tests/test_sync_issues.py -v
+
+# 統合テスト (GitLab API)
+INTEGRATION_TEST=1 SYNC_TOKEN=<token> uv run pytest tests/test_integration.py -v
+
+# パイプライン E2E テスト (CI/CD)
+PIPELINE_TEST=1 SYNC_TOKEN=<token> CI_PROJECT_ID=<id> uv run pytest tests/test_pipeline.py -v
+```
+
+## 10. Docker ネットワークの注意事項
+
+`docker-compose.yml` では以下のポート構成を使用しています。
+
+| 設定 | 値 | 説明 |
+|------|-----|------|
+| `external_url` | `http://gitlab.local:8080` | ブラウザからアクセスする URL |
+| `nginx['listen_port']` | `80` | コンテナ内で nginx がリッスンするポート |
+| ポートマッピング | `8080:80` | ホストの 8080 → コンテナの 80 |
+| Docker 内サービス名 | `gitlab` | Runner からのアクセスに使用 |
+
+`external_url` にポート番号を含めると、nginx が内部でもそのポートでリッスンしようとするため、
+`nginx['listen_port'] = 80` を明示する必要があります。
+
+## 11. 停止 / 完全削除
 
 ```bash
 docker compose down          # 停止のみ(データは残る)

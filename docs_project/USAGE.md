@@ -22,7 +22,7 @@ scripts/
   sync_wiki.py
   sync_issues.py
 .gitlab-ci.yml
-requirements.txt      # または pyproject.toml + uv.lock
+requirements.txt
 docs/
   wiki/.gitkeep
   issues/open/.gitkeep
@@ -39,6 +39,10 @@ GitLab UI: **Settings → CI/CD → Variables** に以下を追加します。
 | `GITLAB_URL` | `http://your-gitlab-host/` | GitLab インスタンスの URL |
 
 > **注意**: `CI_PROJECT_ID` と `CI_PROJECT_PATH` は GitLab CI が自動で設定するため手動設定は不要です。
+
+> **Docker executor の場合**: Runner のジョブコンテナから GitLab にアクセスできる URL を指定してください。
+> `external_url` と Docker ネットワーク内のアクセス先が異なる場合は、サービス名 (例: `http://gitlab/`) を使用します。
+> また、Runner の `config.toml` に `clone_url` を設定して、クローン時の URL も合わせてください。
 
 ### 3. Personal Access Token を作成
 
@@ -124,6 +128,14 @@ sync:run:
     - your-runner-tag
 ```
 
+## 手動ファイルの保護
+
+`docs/` 配下に手動でファイルを追加しても、同期時に削除されません。
+自動生成ファイルには YAML front matter に `managed_by: gitmirror-md` マーカーが含まれており、
+このマーカーがないファイルは削除対象外です。
+
+ただし、手動追加ファイルは自動生成される `index.md` には反映されません。
+
 ## トラブルシューティング
 
 | 症状 | 対処 |
@@ -131,6 +143,8 @@ sync:run:
 | パイプラインが起動しない | Webhook のログ (Settings → Webhooks → Recent events) を確認。Trigger Token が正しいか確認 |
 | `403 Forbidden` | `SYNC_TOKEN` の scope が不足。`api` + `write_repository` が必要 |
 | `git push` で権限エラー | トークンのユーザーが対象ブランチに push 可能か確認（Protected branches の設定） |
+| `git push` で接続エラー | `GITLAB_URL` が Docker ネットワーク内から到達可能な URL か確認。Runner の `clone_url` 設定も確認 |
 | 再帰的にパイプラインが走る | コミットメッセージに `[skip ci]` が含まれているか確認 |
 | Wiki が同期されない | Wiki 機能が有効か確認。少なくとも1ページ作成が必要 |
 | ローカルネットワークエラー | Admin Area のOutbound requests設定を確認 |
+| パイプラインが pending のまま | Runner が正しく登録されているか、tag (`docker`) が一致しているか確認 |
